@@ -5619,6 +5619,7 @@ public:
 	Does nothing if above conditions are not met.
 	Cell weights are given to Zoltan when balancing the load.
 	Unset cell weights are assumed to be 1.
+	Zoltan is not told about cells with weight < 0.
 
 	User set cell weights are removed when balance_load is called.
 	Children of refined cells inherit their parent's weight.
@@ -10808,12 +10809,18 @@ private:
 			>*
 		>(data);
 		*error = ZOLTAN_OK;
-		return int(dccrg_instance->cell_data.size());
+		int nr_cells = 0;
+		for (const auto& i: dccrg_instance->cell_data) {
+			if (dccrg_instance->get_cell_weight(i.first) > 0) {
+				nr_cells++;
+			}
+		}
+		return nr_cells;
 	}
 
 
 	/*!
-	Writes all cell ids on this process to the global_ids array
+	Writes cell ids on this process with weight > 0 to the global_ids array.
 	*/
 	static void fill_cell_list(
 		void* data,
@@ -10849,6 +10856,10 @@ private:
 				abort();
 			}
 			#endif
+
+			if (dccrg_instance->get_cell_weight(item.first) <= 0) {
+				continue;
+			}
 
 			global_ids[i] = item.first;
 
@@ -11082,9 +11093,16 @@ private:
 			return;
 		}
 
-		if ((unsigned int) number_of_hyperedges != dccrg_instance->cell_data.size()) {
+		int nr_cells = 0;
+		for (const auto& i: dccrg_instance->cell_data) {
+			if (dccrg_instance->get_cell_weight(i.first) >= 0) {
+				nr_cells++;
+			}
+		}
+
+		if (number_of_hyperedges != nr_cells) {
 			std::cerr << "Zoltan is expecting wrong number of hyperedges: " << number_of_hyperedges
-				<< " instead of " << dccrg_instance->cell_data.size()
+				<< " instead of " << nr_cells
 				<< std::endl;
 			*error = ZOLTAN_FATAL;
 			return;
@@ -11093,6 +11111,10 @@ private:
 		int i = 0;
 		int connection_number = 0;
 		for (const auto& item: dccrg_instance->cell_data) {
+
+			if (dccrg_instance->get_cell_weight(item.first) < 0) {
+				continue;
+			}
 
 			hyperedges[i] = item.first;
 			hyperedge_connection_offsets[i] = connection_number;
@@ -11146,7 +11168,14 @@ private:
 		>(data);
 		*error = ZOLTAN_OK;
 
-		*number_of_edge_weights = int(dccrg_instance->cell_data.size());
+		int nr_cells = 0;
+		for (const auto& i: dccrg_instance->cell_data) {
+			if (dccrg_instance->get_cell_weight(i.first) >= 0) {
+				nr_cells++;
+			}
+		}
+
+		*number_of_edge_weights = nr_cells;
 		return;
 	}
 
@@ -11180,10 +11209,17 @@ private:
 		>(data);
 		*error = ZOLTAN_OK;
 
-		if ((unsigned int) number_of_hyperedges != dccrg_instance->cell_data.size()) {
+		int nr_cells = 0;
+		for (const auto& i: dccrg_instance->cell_data) {
+			if (dccrg_instance->get_cell_weight(i.first) >= 0) {
+				nr_cells++;
+			}
+		}
+
+		if (number_of_hyperedges != nr_cells) {
 			std::cerr
 				<< "Zoltan is expecting wrong number of hyperedges: " << number_of_hyperedges
-				<< " instead of " << dccrg_instance->cell_data.size()
+				<< " instead of " << nr_cells
 				<< std::endl;
 			*error = ZOLTAN_FATAL;
 			return;
@@ -11191,6 +11227,10 @@ private:
 
 		int i = 0;
 		for (const auto& item: dccrg_instance->cell_data) {
+
+			if (dccrg_instance->get_cell_weight(item.first) < 0) {
+				continue;
+			}
 
 			hyperedges[i] = item.first;
 
