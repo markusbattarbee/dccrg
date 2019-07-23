@@ -11036,11 +11036,23 @@ private:
 		>(data);
 		*error = ZOLTAN_OK;
 
-		*number_of_hyperedges = int(dccrg_instance->cell_data.size());
+		int nr_cells = 0;
+		for (const auto& i: dccrg_instance->cell_data) {
+			if (dccrg_instance->get_cell_weight(i.first) > 0) {
+				nr_cells++;
+			}
+		}
+
+		*number_of_hyperedges = nr_cells;
 		*format = ZOLTAN_COMPRESSED_EDGE;
 
 		*number_of_connections = 0;
+
 		for (const auto& item: dccrg_instance->cell_data) {
+
+			if (dccrg_instance->get_cell_weight(item.first) <= 0) {
+				continue;
+			}
 
 			(*number_of_connections)++;
 
@@ -11095,7 +11107,7 @@ private:
 
 		int nr_cells = 0;
 		for (const auto& i: dccrg_instance->cell_data) {
-			if (dccrg_instance->get_cell_weight(i.first) >= 0) {
+			if (dccrg_instance->get_cell_weight(i.first) > 0) {
 				nr_cells++;
 			}
 		}
@@ -11112,7 +11124,7 @@ private:
 		int connection_number = 0;
 		for (const auto& item: dccrg_instance->cell_data) {
 
-			if (dccrg_instance->get_cell_weight(item.first) < 0) {
+			if (dccrg_instance->get_cell_weight(item.first) <= 0) {
 				continue;
 			}
 
@@ -11170,7 +11182,7 @@ private:
 
 		int nr_cells = 0;
 		for (const auto& i: dccrg_instance->cell_data) {
-			if (dccrg_instance->get_cell_weight(i.first) >= 0) {
+			if (dccrg_instance->get_cell_weight(i.first) > 0) {
 				nr_cells++;
 			}
 		}
@@ -11211,7 +11223,7 @@ private:
 
 		int nr_cells = 0;
 		for (const auto& i: dccrg_instance->cell_data) {
-			if (dccrg_instance->get_cell_weight(i.first) >= 0) {
+			if (dccrg_instance->get_cell_weight(i.first) > 0) {
 				nr_cells++;
 			}
 		}
@@ -11228,7 +11240,7 @@ private:
 		int i = 0;
 		for (const auto& item: dccrg_instance->cell_data) {
 
-			if (dccrg_instance->get_cell_weight(item.first) < 0) {
+			if (dccrg_instance->get_cell_weight(item.first) <= 0) {
 				continue;
 			}
 
