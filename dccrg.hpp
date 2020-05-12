@@ -363,6 +363,7 @@ public:
 		no_load_balancing(other.get_no_load_balancing()),
 		reserved_options(other.get_reserved_options()),
 		cell_weights(other.get_cell_weights()),
+                cell_weights_vectors(other.get_cell_weights_vectors()),
 		neighbor_processes(other.get_neighbor_processes()),
 		balancing_load(other.get_balancing_load())
 	{
@@ -3453,6 +3454,7 @@ public:
 		this->unrefined_cell_data.clear();
 		this->cells_not_to_unrefine.clear();
 		this->cell_weights.clear();
+		this->cell_weights_vectors.clear();
 
 		#ifdef DEBUG
 		// check that there are no duplicate adds / removes
@@ -5643,6 +5645,25 @@ public:
 		return true;
 	}
 
+        bool set_cell_weight_vector(const uint64_t cell, const std::vector<double> weights)
+	{
+		if (this->cell_process.count(cell) == 0) {
+			return false;
+		}
+
+		if (this->cell_process.at(cell) != this->rank) {
+			return false;
+		}
+
+		if (cell != this->get_child(cell)) {
+			return false;
+		}
+
+		this->cell_weights_vectors[cell] = weights;
+
+	return true;
+	}
+
 	/*!
 	Returns the weight of given local existing cell without children.
 
@@ -5670,6 +5691,33 @@ public:
 		}
 	}
 
+	/*!
+	Returns the weight of given local existing cell without children.
+
+	Returns an empty vector if above conditions are not met.
+	Unset cell weights are assumed to be 1.
+	*/
+        std::vector<double> get_cell_weight_vector(const uint64_t cell) const
+	{
+		if (this->cell_process.count(cell) == 0) {
+			return std::vector<double>();			  
+		}
+
+		if (this->cell_process.at(cell) != this->rank) {
+			return std::vector<double>();			  
+		}
+
+		if (cell != this->get_child(cell)) {
+			return std::vector<double>();			  
+		}
+
+		if (this->cell_weights_vectors.count(cell) == 0) {
+ 		        // TODO: Vector length should match "OBJ_WEIGHT_DIM"
+		        return std::vector<double>{1,1,1};
+		} else {
+			return this->cell_weights_vectors.at(cell);
+		}
+	}
 
 	/*!
 	Returns the cells that will be added to this process by load balancing.
@@ -5802,6 +5850,10 @@ public:
 	const std::unordered_map<uint64_t, double>& get_cell_weights() const
 	{
 		return this->cell_weights;
+	}
+        const std::unordered_map<uint64_t, std::vector<double>>& get_cell_weights_vectors() const
+	{
+		return this->cell_weights_vectors;
 	}
 
 
@@ -6627,8 +6679,9 @@ private:
 	std::unordered_set<std::string> reserved_options;
 
 	// optional user-given weights of cells on this process
-	std::unordered_map<uint64_t, double> cell_weights;
-
+        std::unordered_map<uint64_t, double> cell_weights;
+        std::unordered_map<uint64_t, std::vector<double>> cell_weights_vectors;
+  
 	// processes which have cells close enough from cells of this process
 	std::unordered_set<uint64_t> neighbor_processes;
 
@@ -6932,7 +6985,7 @@ private:
 		this->reserved_options.insert("EDGE_WEIGHT_DIM");
 		this->reserved_options.insert("NUM_GID_ENTRIES");
 		this->reserved_options.insert("NUM_LID_ENTRIES");
-		this->reserved_options.insert("OBJ_WEIGHT_DIM");
+		//this->reserved_options.insert("OBJ_WEIGHT_DIM");
 		this->reserved_options.insert("RETURN_LISTS");
 		this->reserved_options.insert("NUM_GLOBAL_PARTS");
 		this->reserved_options.insert("NUM_LOCAL_PARTS");
@@ -6945,7 +6998,7 @@ private:
 		Zoltan_Set_Param(this->zoltan, "EDGE_WEIGHT_DIM", "0");
 		Zoltan_Set_Param(this->zoltan, "NUM_GID_ENTRIES", "1");
 		Zoltan_Set_Param(this->zoltan, "NUM_LID_ENTRIES", "0");
-		Zoltan_Set_Param(this->zoltan, "OBJ_WEIGHT_DIM", "1");
+		Zoltan_Set_Param(this->zoltan, "OBJ_WEIGHT_DIM", "3");
 		Zoltan_Set_Param(this->zoltan, "RETURN_LISTS", "ALL");
 
 		// set other options
@@ -9174,6 +9227,15 @@ private:
 				}
 				this->cell_weights.erase(refined);
 			}
+			// children of refined cells inherit their weight (vectors)
+			if (this->rank == process_of_refined
+			&& this->cell_weights_vectors.count(refined) > 0) {
+			        std::vector<double> parentweight = this->cell_weights_vectors.at(refined);
+				for (const uint64_t child: children) {
+					this->cell_weights_vectors[child] = parentweight;
+				}
+				this->cell_weights_vectors.erase(refined);
+			}
 
 			// use local neighbor lists to find cells whose neighbor lists have to updated
 			if (this->rank == process_of_refined) {
@@ -9335,6 +9397,7 @@ private:
 			this->pin_requests.erase(unrefined);
 			this->new_pin_requests.erase(unrefined);
 			this->cell_weights.erase(unrefined);
+			this->cell_weights_vectors.erase(unrefined);
 
 			// don't send unrefined cells' user data to self
 			if (this->rank == process_of_unrefined
@@ -10789,11 +10852,24 @@ private:
 
 			global_ids[i] = item.first;
 
-			if (number_of_weights_per_object > 0) {
+			if (number_of_weights_per_object == 1) {
 				if (dccrg_instance->cell_weights.count(item.first) > 0) {
 					object_weights[i] = float(dccrg_instance->cell_weights.at(item.first));
 				} else {
 					object_weights[i] = 1;
+				}
+			}
+			// Vector weights
+			if (number_of_weights_per_object > 1) {
+				if (dccrg_instance->cell_weights_vectors.count(item.first) > 0) {
+				  for (uint veci=0; veci<number_of_weights_per_object; ++veci) {
+				    object_weights[i*number_of_weights_per_object+veci] = float((dccrg_instance->cell_weights_vectors.at(item.first)).at(veci));
+				    //object_weights[i*number_of_weights_per_object+veci] = float(1);
+				  }
+				} else {
+				  for (uint veci=0; veci<number_of_weights_per_object; ++veci) {
+				    object_weights[i*number_of_weights_per_object+veci] = 1;
+				  }
 				}
 			}
 
