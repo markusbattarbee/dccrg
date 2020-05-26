@@ -766,7 +766,8 @@ public:
 		const uint64_t cell,
 		const int neighborhood_id = default_neighborhood_id
 	) const {
-		if (this->cell_data.count(cell) > 0) {
+	  //if (this->cell_data.count(cell) > 0) {
+	  if (true) {
 			if (neighborhood_id == default_neighborhood_id) {
 				#ifdef DEBUG
 				if (this->neighbors_of.count(cell) == 0) {
@@ -2562,14 +2563,14 @@ public:
 	get_neighbors_of()
 	*/
 	std::vector<std::pair<uint64_t, int> > get_face_neighbors_of(
-		const uint64_t cell/*,
-		const int neighborhood_id = default_neighborhood_id*/
+		const uint64_t cell,
+		const int neighborhood_id = default_neighborhood_id
 	) const {
 		std::vector<std::pair<uint64_t, int> > ret_val;
 
-		if (this->cell_data.count(cell) == 0) {
-			return ret_val;
-		}
+		// if (this->cell_data.count(cell) == 0) {
+		// 	return ret_val;
+		// }
 
 		// get location of face neighbors' offsets in neighborhood_of
 		std::array<size_t, 2 * 3> neighborhood_of_indices = {{0, 0, 0, 0, 0, 0}};
@@ -2581,7 +2582,8 @@ public:
 			const size_t neigh_of_indices_index
 				= 2 * dimension + ((direction > 0) ? 1 : 0);
 
-			for (size_t i = 0; i <= this->neighborhood_of.size(); i++) {
+			if (neighborhood_id == default_neighborhood_id) {
+			  for (size_t i = 0; i <= this->neighborhood_of.size(); i++) {
 				if (i == this->neighborhood_of.size()) {
 					std::cerr << __FILE__ << ":" << __LINE__
 						<< " Neighborhood_of offsets not found for face neighbors in dimension: "
@@ -2607,6 +2609,35 @@ public:
 					neighborhood_of_indices[neigh_of_indices_index] = i;
 					break;
 				}
+			  } //MCB
+			} else if (this->user_hood_of.count(neighborhood_id) > 0) {
+			  for (size_t i = 0; i <= this->user_hood_of.at(neighborhood_id).size(); i++) {
+				if (i == this->user_hood_of.at(neighborhood_id).size()) {
+					std::cerr << __FILE__ << ":" << __LINE__
+						<< " Neighborhood_of offsets not found for face neighbors in dimension: "
+						<< dimension << ", direction: " << direction
+						<< std::endl;
+					abort();
+				}
+
+				bool found = true;
+				for (size_t other_dims = 0; other_dims < 3; other_dims++) {
+					if (other_dims != dimension
+					&& this->user_hood_of.at(neighborhood_id)[i][other_dims] != 0) {
+						found = false;
+						break;
+					}
+				}
+
+				if (this->user_hood_of.at(neighborhood_id)[i][dimension] != direction) {
+					found = false;
+				}
+
+				if (found) {
+					neighborhood_of_indices[neigh_of_indices_index] = i;
+					break;
+				}
+			  }
 			}
 		}
 
@@ -2614,6 +2645,7 @@ public:
 		std::array<size_t, 2 * 3> current_index = {{0, 0, 0, 0, 0, 0}};
 		const int refinement_level = this->mapping.get_refinement_level(cell);
 
+	      if (neighborhood_id == default_neighborhood_id) {
 		for (size_t
 			neighbor_i = 0;
 			neighbor_i < this->neighbors_of.at(cell).size();
@@ -2714,7 +2746,109 @@ public:
 				neighbor_i += 7;
 			}
 		}
+	      } else if (this->user_hood_of.count(neighborhood_id) > 0) {
+		for (size_t
+			neighbor_i = 0;
+		        neighbor_i < this->user_neigh_of.at(neighborhood_id).at(cell).size();
+			neighbor_i++
+		) {
 
+			const auto neighbor = this->user_neigh_of.at(neighborhood_id).at(cell)[neighbor_i].first;
+
+			if (neighbor == error_cell) {
+				for (size_t i = 0; i < current_index.size(); i++) {
+					current_index[i]++;
+				}
+				continue;
+			}
+
+			const int neigh_ref_lvl = this->mapping.get_refinement_level(neighbor);
+
+			for (int direction = -1; direction <= 1; direction += 2)
+			for (size_t dimension = 0; dimension < 3; dimension++) {
+
+				// neigh_of_indices[n] == negative direction, n + 1 positive
+				const size_t neigh_of_indices_index
+					= 2 * dimension + ((direction > 0) ? 1 : 0);
+
+				// at correct index in neighbors_of for current dim & dir
+				if (current_index[neigh_of_indices_index]
+				== neighborhood_of_indices[neigh_of_indices_index]) {
+
+					int final_dir = int(dimension) + 1;
+					if (direction < 0) {
+						final_dir *= -1;
+					}
+
+					// add one neighbor not smaller than given cell
+					if (neigh_ref_lvl <= refinement_level) {
+
+						ret_val.push_back(std::make_pair(neighbor, final_dir));
+
+					// add only face neighbors in current dim & dir
+					} else {
+
+						const uint64_t neighs_in_offset = uint64_t(1) << 3;
+
+						#ifdef DEBUG
+						if (this->user_neigh_of.at(neighborhood_id).at(cell).size() < neighbor_i + neighs_in_offset) {
+							std::cerr << __FILE__ << ":" << __LINE__
+								<< " Invalid number of neighbors for cell " << cell
+								<< " while processing dimension " << dimension
+								<< " and direction " << direction
+								<< " starting at index " << neighbor_i
+								<< std::endl;
+							abort();
+						}
+						#endif
+
+						// see find_neighbors_of(...) for the order of these
+						std::vector<uint64_t> dir_neighs;
+						for (size_t i = neighbor_i; i < neighbor_i + neighs_in_offset; i++) {
+							dir_neighs.push_back(this->user_neigh_of.at(neighborhood_id).at(cell)[i].first);
+						}
+
+						// neighbor at offset    0, 1, 2, 3, 4, 5, 6, 7 is
+						// face neighbor of given cell when neighbors are in
+						// dim = 0, dir = -1      , y,  , y,  , y,  , y
+						// dim = 0, dir = +1     y,  , y,  , y,  , y,
+						// dim = 1, dir = -1      ,  , y, y,  ,  , y, y
+						// dim = 1, dir = +1     y, y,  ,  , y, y,  ,
+						// dim = 2, dir = -1      ,  ,  ,  , y, y, y, y
+						// dim = 2, dir = +1     y, y, y, y,  ,  ,  ,
+						const size_t
+							batch_size = size_t(1) << dimension,
+							mod_target = (direction < 0) ? 1 : 0;
+
+						for (size_t i = 0; i < neighs_in_offset; i++) {
+
+							#ifdef DEBUG
+							if (dir_neighs[i] == error_cell) {
+							std::cerr << __FILE__ << ":" << __LINE__
+								<< " Invalid neighbor of cell " << cell
+								<< " at index " << neighbor_i + i
+								<< std::endl;
+							abort();
+							}
+							#endif
+
+							if ((i / batch_size) % 2 == mod_target) {
+								ret_val.push_back(std::make_pair(dir_neighs[i], final_dir));
+							}
+						}
+					}
+				}
+
+				current_index[neigh_of_indices_index]++;
+			}
+
+			// skip all cells in this neighborhood offset
+			if (neigh_ref_lvl > refinement_level) {
+				neighbor_i += 7;
+			}
+		}
+
+	      }
 		return ret_val;
 	}
 
@@ -8228,8 +8362,9 @@ private:
 	*/
 	void update_remote_neighbor_info(const uint64_t cell)
 	{
-		if (this->cell_data.count(cell) == 0) {
-			return;
+	  //if (this->cell_data.count(cell) == 0) {
+	        if (this->cell_process.at(cell) != this->rank) {
+		    return;
 		}
 
 		if (cell != this->get_child(cell)) {
@@ -8237,9 +8372,16 @@ private:
 		}
 
 		// TODO: also update remote_cells_on_process_boundary
-		this->local_cells_on_process_boundary.erase(cell);
+		//this->local_cells_on_process_boundary.erase(cell);
 
 		#ifdef DEBUG
+		if (this->cell_data.count(cell) == 0) {
+		  std::cerr << __FILE__ << ":" << __LINE__
+			    << " User data for cell " << cell
+			    << " doesn't exist"
+			    << std::endl;
+		  abort();
+		}
 		if (this->neighbors_of.count(cell) == 0) {
 			std::cerr << __FILE__ << ":" << __LINE__
 				<< " Neighbor list for cell " << cell
@@ -8320,8 +8462,9 @@ private:
 	*/
 	void update_user_remote_neighbor_info(const uint64_t cell, const int neighborhood_id)
 	{
-		if (this->cell_data.count(cell) == 0) {
-			return;
+	  //if (this->cell_data.count(cell) == 0) {
+	        if (this->cell_process.at(cell) != this->rank) {
+		        return;
 		}
 
 		if (cell != this->get_child(cell)) {
@@ -8376,7 +8519,7 @@ private:
 		}
 		#endif
 
-		this->user_local_cells_on_process_boundary.at(neighborhood_id).erase(cell);
+		//this->user_local_cells_on_process_boundary.at(neighborhood_id).erase(cell);
 
 		// neighbors of given cell
 		for (const auto& neighbor_i: this->user_neigh_of.at(neighborhood_id).at(cell)) {
@@ -10078,7 +10221,6 @@ private:
 		) {
 			std::vector<MPI_Status> statuses;
 			statuses.resize(process->second.size());
-
 			ret_val = MPI_Waitall(process->second.size(), &(process->second[0]), &(statuses[0]));
 			if (ret_val != MPI_SUCCESS) {
 				for (const auto& status: statuses) {
@@ -10111,7 +10253,6 @@ private:
 		) {
 			std::vector<MPI_Status> statuses;
 			statuses.resize(process->second.size());
-
 			if (
 				MPI_Waitall(process->second.size(), &(process->second[0]), &(statuses[0]))
 				!= MPI_SUCCESS
