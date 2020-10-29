@@ -519,9 +519,7 @@ public:
 				+ "Couldn't create cells of refinement level 0"
 			);
 		}
-                std::cerr<<"begin update neighbors"<<std::endl;
 		this->update_neighbors_();
-                std::cerr<<"begin init neighbors"<<std::endl;
 
 		if (!this->initialize_neighbors()) {
 			throw std::invalid_argument(
@@ -530,10 +528,8 @@ public:
 			);
 		}
 
-                std::cerr<<"begin allocate copies of remote neighbors"<<std::endl;
 		this->allocate_copies_of_remote_neighbors();
 
-                std::cerr<<"begin update cell pointers"<<std::endl;
 		try {
 			this->update_cell_pointers(
 				this->cells_rw,
@@ -3555,17 +3551,17 @@ public:
 		// 	item != this->cell_process.end();
 		// 	item++
 		// ) {
-//#pragma omp parallel
+#pragma omp parallel
                 {
-                size_t cnt = 0;
-                // int ithread = omp_get_thread_num();
-                // int nthreads = omp_get_num_threads();
+                   size_t cnt = 0;
+                   int ithread = omp_get_thread_num();
+                   int nthreads = omp_get_num_threads();
                 for(auto item = this->cell_process.begin(); item !=this->cell_process.end(); ++item, cnt++) {
-                   //if(cnt%nthreads != ithread) continue;
+                   if(cnt%nthreads != ithread) continue;
                    const uint64_t child = this->get_child(item->first);
 
 			if (child == item->first) {
-//#pragma omp critical
+#pragma omp critical
 				ret_val.push_back(item->first);
 			}
 		}
@@ -4080,14 +4076,14 @@ public:
 			this->user_neigh_of.at(h.first).clear();
 			this->user_neigh_to.at(h.first).clear();
 		}
-//#pragma omp parallel
+#pragma omp parallel
                 {
                    size_t cnt = 0;
-                   //int ithread = omp_get_thread_num();
-                   //int nthreads = omp_get_num_threads();
+                   int ithread = omp_get_thread_num();
+                   int nthreads = omp_get_num_threads();
                    for(auto i = this->cell_process.begin(); i !=this->cell_process.end(); ++i, cnt++) {
-                      //if(cnt%nthreads != ithread) continue;
-//		for (const auto& i: this->cell_process) {
+                      if(cnt%nthreads != ithread) continue;
+                      //for (const auto& i: this->cell_process) {
 			for (const auto& j: this->user_hood_of) {
 				this->update_user_neighbors(i->first, j.first);
 			}
@@ -8269,18 +8265,17 @@ private:
 	bool initialize_neighbors()
 	{
 		// update neighbor lists of local cells and remote neighbors
-//#pragma omp parallel
+#pragma omp parallel
            {
               size_t cnt = 0;
-              //int ithread = omp_get_thread_num();
-              //int nthreads = omp_get_num_threads();
+              int ithread = omp_get_thread_num();
+              int nthreads = omp_get_num_threads();
               for(auto item = this->cell_process.begin(); item !=this->cell_process.end(); ++item, cnt++) {
-                 //if(cnt%nthreads != ithread) continue;
-                 //std::cerr<<"item->first"<<item->first<<std::endl;
+                 if(cnt%nthreads != ithread) continue;
               //for (const auto& item: this->cell_process) {
-			this->neighbors_of[item->first]
-				= this->find_neighbors_of(item->first, this->neighborhood_of);
-			#ifdef DEBUG
+                 std::vector<std::pair<uint64_t,std::array<int, 3>>> n_of = this->find_neighbors_of(item->first, this->neighborhood_of);
+                 std::vector<std::pair<uint64_t,std::array<int, 3>>> n_to = this->find_neighbors_to(item->first, this->neighborhood_to);
+                        #ifdef DEBUG
 			for (const auto& neighbor: this->neighbors_of.at(item->first)) {
 				if (neighbor.first == error_cell) {
 					continue;
@@ -8298,8 +8293,11 @@ private:
 			}
 			#endif
 
-			this->neighbors_to[item->first]
-				= this->find_neighbors_to(item->first, this->neighborhood_to);
+                        #pragma omp critical
+                        {
+                           this->neighbors_to[item->first] = n_to;
+                           this->neighbors_of[item->first] = n_of;
+                        }
 		}
            } // end omp parallel
 		#ifdef DEBUG
@@ -8940,7 +8938,6 @@ private:
                    int nthreads = omp_get_num_threads();
                    for(auto item = this->cell_process.begin(); item !=this->cell_process.end(); ++item, cnt++) {
                       if(cnt%nthreads != ithread) continue;
-                      std::cerr<<"update item->first"<<item->first<<std::endl;
                       //for (const auto& i: this->cell_process) {
                       //  this->update_neighbors(i.first);
                       this->update_neighbors(item->first);
@@ -8972,8 +8969,13 @@ private:
 			return;
 		}
 
-		this->neighbors_of[cell] = this->find_neighbors_of(cell, this->neighborhood_of);
-		this->neighbors_to[cell] = this->find_neighbors_to(cell, this->neighborhood_to);
+                std::vector<std::pair<uint64_t,std::array<int, 3>>> n_of = this->find_neighbors_of(cell, this->neighborhood_of);
+                std::vector<std::pair<uint64_t,std::array<int, 3>>> n_to = this->find_neighbors_to(cell, this->neighborhood_to);
+#pragma omp critical
+                {
+                   this->neighbors_of[cell] = n_of;
+                   this->neighbors_to[cell] = n_to;
+                }
 
 		#ifdef DEBUG
 		if (
@@ -9021,11 +9023,13 @@ private:
 	*/
 	void update_user_neighbors(const uint64_t cell, const int neighborhood_id)
 	{
-		this->user_neigh_of[neighborhood_id][cell]
-			= this->find_neighbors_of(cell, this->user_hood_of.at(neighborhood_id));
-
-		this->user_neigh_to[neighborhood_id][cell]
-			= this->find_neighbors_to(cell, this->user_hood_to.at(neighborhood_id));
+                std::vector<std::pair<uint64_t,std::array<int, 3>>> n_of = this->find_neighbors_of(cell, this->user_hood_of.at(neighborhood_id));
+                std::vector<std::pair<uint64_t,std::array<int, 3>>> n_to = this->find_neighbors_to(cell, this->user_hood_to.at(neighborhood_id));
+#pragma omp critical
+                {
+                   this->user_neigh_of[neighborhood_id][cell] = n_of;
+                   this->user_neigh_to[neighborhood_id][cell] = n_to;
+                }
 	}
 
 
@@ -9369,12 +9373,10 @@ private:
                    int nthreads = omp_get_num_threads();
                    for(auto item = this->cell_process.begin(); item !=this->cell_process.end(); ++item, cnt++) {
                       if(cnt%nthreads != ithread) continue;
-                      std::cerr<<"upd_ item->first "<<this->cell_process.size()<<" "<<ithread<<" "<<nthreads<<" "<<item->first<<std::endl;
-                      
 //                   for (const auto& i: this->cell_process) {
                       //this->update_neighbors_(i.first);
                       this->update_neighbors_(item->first);
-		}
+                   }
                 } // end omp parallel
 	}
 
@@ -9474,8 +9476,11 @@ private:
 			#endif
 		}
 
+#pragma omp critical
+                {      
 		this->neighbors_[cell] = new_neighbors_;
-
+                }
+                
 		#ifdef DEBUG
 		for (const auto& n: new_neighbors_) {
 			if (n == error_cell) {
@@ -10230,7 +10235,14 @@ private:
 		#endif
 
 		// refines
-		for (const auto& refined: this->cells_to_refine) {
+//		for (const auto& refined: this->cells_to_refine) {
+#pragma omp parallel
+                {
+                   size_t cnt = 0;
+                   int ithread = omp_get_thread_num();
+                   int nthreads = omp_get_num_threads();
+                   for(auto& refined = this->cells_to_refine.begin(); item !=this->cells_to_refine.end(); ++item, cnt++) {
+                      if(cnt%nthreads != ithread) continue;
 
 			#ifdef DEBUG
 			if (this->cell_process.count(refined) == 0) {
@@ -10275,8 +10287,11 @@ private:
 			// move user data of refined cells into refined_cell_data
 			if (this->rank == process_of_refined) {
 				// TODO: move data instead of copying
-				this->refined_cell_data[refined] = this->cell_data.at(refined);
-				this->cell_data.erase(refined);
+#pragma omp critical
+                           {
+                           this->refined_cell_data[refined] = this->cell_data.at(refined);
+                           this->cell_data.erase(refined);
+                           }
 			}
 
 			// add children of refined cells into the grid
@@ -10286,39 +10301,54 @@ private:
 			}
 
 			for (const uint64_t child: children) {
-				this->cell_process[child] = process_of_refined;
-
+#pragma omp critical
+                                {
+                                   this->cell_process[child] = process_of_refined;
+                                }
 				if (this->rank == process_of_refined) {
+#pragma omp critical
+                                   {
 					this->cell_data[child];
 					this->neighbors_of[child];
 					this->neighbors_to[child];
 					new_cells.push_back(child);
-				}
+                                   }
+                                }
 			}
 
 			// children of refined cells inherit their pin request status
 			if (this->pin_requests.count(refined) > 0) {
+#pragma omp critical
+                                   {
 				for (const uint64_t child: children) {
 					this->pin_requests[child] = this->pin_requests.at(refined);
 				}
 				this->pin_requests.erase(refined);
+                                   }
 			}
 			if (this->new_pin_requests.count(refined) > 0) {
+#pragma omp critical
+                                   {
 				for (const uint64_t child: children) {
 					this->new_pin_requests[child] = this->new_pin_requests.at(refined);
 				}
 				this->new_pin_requests.erase(refined);
-			}
+                                   }
+                        }
 
 			// children of refined cells inherit their weight
 			if (this->rank == process_of_refined
 			&& this->cell_weights.count(refined) > 0) {
+#pragma omp critical
+                                   {
 				for (const uint64_t child: children) {
 					this->cell_weights[child] = this->cell_weights.at(refined);
 				}
 				this->cell_weights.erase(refined);
+                                   }
 			}
-		}
+                   }
+                } // end omp parallel
 
 		// initially only one sibling recorded per
 		// process when unrefining, insert rest now
@@ -10567,11 +10597,21 @@ private:
 			this->user_neigh_of.at(h.first).clear();
 			this->user_neigh_to.at(h.first).clear();
 		}
-		for (const auto& i: this->cell_process) {
+#pragma omp parallel
+                {
+                   size_t cnt = 0;
+                   int ithread = omp_get_thread_num();
+                   int nthreads = omp_get_num_threads();
+                   for(auto item = this->cell_process.begin(); item !=this->cell_process.end(); ++item, cnt++) {
+                      if(cnt%nthreads != ithread) continue;
+
+                      //for (const auto& i: this->cell_process) {
 			for (const auto& j: this->user_hood_of) {
-				this->update_user_neighbors(i.first, j.first);
+                           //this->update_user_neighbors(i.first, j.first);
+                           this->update_user_neighbors(item->first, j.first);
 			}
-		}
+                   }
+		} // end omp parallel
 
 		#ifdef DEBUG
 		if (!this->verify_neighbors()) {
