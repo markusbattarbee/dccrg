@@ -10235,15 +10235,7 @@ private:
 		#endif
 
 		// refines
-//		for (const auto& refined: this->cells_to_refine) {
-#pragma omp parallel
-                {
-                   size_t cnt = 0;
-                   int ithread = omp_get_thread_num();
-                   int nthreads = omp_get_num_threads();
-                   for(auto& refined = this->cells_to_refine.begin(); item !=this->cells_to_refine.end(); ++item, cnt++) {
-                      if(cnt%nthreads != ithread) continue;
-
+		for (const auto& refined: this->cells_to_refine) {
 			#ifdef DEBUG
 			if (this->cell_process.count(refined) == 0) {
 				std::cerr << __FILE__ << ":" << __LINE__
@@ -10287,11 +10279,8 @@ private:
 			// move user data of refined cells into refined_cell_data
 			if (this->rank == process_of_refined) {
 				// TODO: move data instead of copying
-#pragma omp critical
-                           {
-                           this->refined_cell_data[refined] = this->cell_data.at(refined);
-                           this->cell_data.erase(refined);
-                           }
+                                this->refined_cell_data[refined] = this->cell_data.at(refined);
+                                this->cell_data.erase(refined);
 			}
 
 			// add children of refined cells into the grid
@@ -10301,54 +10290,38 @@ private:
 			}
 
 			for (const uint64_t child: children) {
-#pragma omp critical
-                                {
-                                   this->cell_process[child] = process_of_refined;
-                                }
+                                this->cell_process[child] = process_of_refined;
 				if (this->rank == process_of_refined) {
-#pragma omp critical
-                                   {
 					this->cell_data[child];
 					this->neighbors_of[child];
 					this->neighbors_to[child];
 					new_cells.push_back(child);
-                                   }
                                 }
 			}
 
 			// children of refined cells inherit their pin request status
 			if (this->pin_requests.count(refined) > 0) {
-#pragma omp critical
-                                   {
 				for (const uint64_t child: children) {
 					this->pin_requests[child] = this->pin_requests.at(refined);
 				}
 				this->pin_requests.erase(refined);
-                                   }
 			}
 			if (this->new_pin_requests.count(refined) > 0) {
-#pragma omp critical
-                                   {
 				for (const uint64_t child: children) {
 					this->new_pin_requests[child] = this->new_pin_requests.at(refined);
 				}
 				this->new_pin_requests.erase(refined);
-                                   }
                         }
 
 			// children of refined cells inherit their weight
 			if (this->rank == process_of_refined
 			&& this->cell_weights.count(refined) > 0) {
-#pragma omp critical
-                                   {
 				for (const uint64_t child: children) {
 					this->cell_weights[child] = this->cell_weights.at(refined);
 				}
 				this->cell_weights.erase(refined);
-                                   }
 			}
-                   }
-                } // end omp parallel
+                }
 
 		// initially only one sibling recorded per
 		// process when unrefining, insert rest now
