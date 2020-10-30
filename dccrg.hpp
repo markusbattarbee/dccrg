@@ -8275,6 +8275,11 @@ private:
               //for (const auto& item: this->cell_process) {
                  std::vector<std::pair<uint64_t,std::array<int, 3>>> n_of = this->find_neighbors_of(item->first, this->neighborhood_of);
                  std::vector<std::pair<uint64_t,std::array<int, 3>>> n_to = this->find_neighbors_to(item->first, this->neighborhood_to);
+                        #pragma omp critical
+                        {
+                           this->neighbors_to[item->first] = n_to;
+                           this->neighbors_of[item->first] = n_of;
+                        }
                         #ifdef DEBUG
 			for (const auto& neighbor: this->neighbors_of.at(item->first)) {
 				if (neighbor.first == error_cell) {
@@ -8292,12 +8297,6 @@ private:
 				}
 			}
 			#endif
-
-                        #pragma omp critical
-                        {
-                           this->neighbors_to[item->first] = n_to;
-                           this->neighbors_of[item->first] = n_of;
-                        }
 		}
            } // end omp parallel
 		#ifdef DEBUG
