@@ -2868,7 +2868,7 @@ public:
 		std::vector<std::pair<uint64_t, std::array<int, 4>>> return_neighbors;
 		if (
 			this->cell_process.count(cell) == 0
-			or this->cell_process.at(cell) != this->rank
+			//or this->cell_process.at(cell) != this->rank
 			or (x == 0 and y == 0 and z == 0)
 		) {
 			return return_neighbors;
@@ -5542,7 +5542,7 @@ public:
 		const bool sorted = false
 	) const {
 		std::vector<uint64_t> ret_val;
-
+                // Query MCB: Does this also return remote cells? There's no rank check.
 		if (neighborhood_id == default_neighborhood_id) {
 
 			for (const auto& item: this->cell_data) {
@@ -8107,16 +8107,9 @@ public:
         void update_remote_cell_information(const std::vector<uint64_t> cells)
 	{
 	   for (uint i=0; i<cells.size(); i++) {
-	     if (this->cell_data.count(cells[i]) == 0) {
-	       //this->cell_data[cells[i]];
-	       //std::cerr<<"ZeroData:"<<cells[i]<<std::endl;
-	     }
 	     this->update_neighbors(cells[i]);
 	   }
-	   for (uint i=0; i<cells.size(); i++) {	  
-	      this->update_remote_neighbor_info(cells[i]);
-	   }
-	   // also remote neighbor info of user neighborhoods
+	   // also remote neighbor data of user neighborhoods
 	   for (std::unordered_map<int, std::vector<Types<3>::neighborhood_item_t>>::const_iterator
 		 item = this->user_hood_of.begin();
 	         item != this->user_hood_of.end();
@@ -8125,10 +8118,9 @@ public:
 	      for (uint i=0; i<cells.size(); i++) {
 		 this->update_user_neighbors(cells[i],item->first);
 	      }
-	      for (uint i=0; i<cells.size(); i++) {
-		 this->update_user_remote_neighbor_info(cells[i], item->first);
-	      }
 	   }
+           // update_remote_neighbor_info() and update_user_remote_neighbor_info() are
+           // about which cells are actually remote or local so not touched here
 	}
 
 private:
@@ -8334,8 +8326,8 @@ private:
 			#endif
 
 			if (this->cell_process.at(neighbor_to) != this->rank) {
-				this->local_cells_on_process_boundary.insert(cell);
-				this->remote_cells_on_process_boundary.insert(neighbor_to);
+                           this->local_cells_on_process_boundary.insert(cell);
+                           this->remote_cells_on_process_boundary.insert(neighbor_to);
 			}
 		}
 
@@ -8358,9 +8350,9 @@ private:
 	*/
         void update_user_remote_neighbor_info(const uint64_t cell, const int neighborhood_id)
 	{
-	        if (this->cell_data.count(cell) == 0) {
-	                return;
-		}
+	        // if (this->cell_data.count(cell) == 0) {
+	        //         return;
+		// }
 
 		if (cell != this->get_child(cell)) {
 			return;
@@ -8435,8 +8427,8 @@ private:
 			#endif
 
 			if (this->cell_process.at(neighbor) != this->rank) {
-				this->user_local_cells_on_process_boundary.at(neighborhood_id).insert(cell);
-				this->user_remote_cells_on_process_boundary.at(neighborhood_id).insert(neighbor);
+                           this->user_local_cells_on_process_boundary.at(neighborhood_id).insert(cell);
+                           this->user_remote_cells_on_process_boundary.at(neighborhood_id).insert(neighbor);
 			}
 		}
 
@@ -8462,8 +8454,8 @@ private:
 			#endif
 
 			if (this->cell_process.at(neighbor_to) != this->rank) {
-				this->user_local_cells_on_process_boundary.at(neighborhood_id).insert(cell);
-				this->user_remote_cells_on_process_boundary.at(neighborhood_id).insert(neighbor_to);
+                           this->user_local_cells_on_process_boundary.at(neighborhood_id).insert(cell);
+                           this->user_remote_cells_on_process_boundary.at(neighborhood_id).insert(neighbor_to);
 			}
 		}
 
