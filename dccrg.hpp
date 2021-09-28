@@ -363,7 +363,7 @@ public:
 		no_load_balancing(other.get_no_load_balancing()),
 		reserved_options(other.get_reserved_options()),
 		cell_weights(other.get_cell_weights()),
-                cell_weights_vectors(other.get_cell_weights_vectors()),
+		cell_weights_vectors(other.get_cell_weights_vectors()),
 		neighbor_processes(other.get_neighbor_processes()),
 		balancing_load(other.get_balancing_load())
 	{
@@ -5645,7 +5645,7 @@ public:
 		return true;
 	}
 
-        bool set_cell_weight_vector(const uint64_t cell, const std::vector<double> weights)
+	bool set_cell_weight_vector(const uint64_t cell, const std::vector<double> weights)
 	{
 		if (this->cell_process.count(cell) == 0) {
 			return false;
@@ -5697,23 +5697,23 @@ public:
 	Returns an empty vector if above conditions are not met.
 	Unset cell weights are assumed to be 1.
 	*/
-        std::vector<double> get_cell_weight_vector(const uint64_t cell) const
+	std::vector<double> get_cell_weight_vector(const uint64_t cell) const
 	{
 		if (this->cell_process.count(cell) == 0) {
-			return std::vector<double>();			  
+			return std::vector<double>();
 		}
 
 		if (this->cell_process.at(cell) != this->rank) {
-			return std::vector<double>();			  
+			return std::vector<double>();
 		}
 
 		if (cell != this->get_child(cell)) {
-			return std::vector<double>();			  
+			return std::vector<double>();
 		}
 
 		if (this->cell_weights_vectors.count(cell) == 0) {
- 		        // TODO: Vector length should match "OBJ_WEIGHT_DIM"
-		        return std::vector<double>{1,1,1};
+			// TODO: Vector length should match "OBJ_WEIGHT_DIM"
+			return std::vector<double>{1,1,1};
 		} else {
 			return this->cell_weights_vectors.at(cell);
 		}
@@ -5851,7 +5851,7 @@ public:
 	{
 		return this->cell_weights;
 	}
-        const std::unordered_map<uint64_t, std::vector<double>>& get_cell_weights_vectors() const
+	const std::unordered_map<uint64_t, std::vector<double>>& get_cell_weights_vectors() const
 	{
 		return this->cell_weights_vectors;
 	}
@@ -6679,9 +6679,9 @@ private:
 	std::unordered_set<std::string> reserved_options;
 
 	// optional user-given weights of cells on this process
-        std::unordered_map<uint64_t, double> cell_weights;
-        std::unordered_map<uint64_t, std::vector<double>> cell_weights_vectors;
-  
+	std::unordered_map<uint64_t, double> cell_weights;
+	std::unordered_map<uint64_t, std::vector<double>> cell_weights_vectors;
+
 	// processes which have cells close enough from cells of this process
 	std::unordered_set<uint64_t> neighbor_processes;
 
@@ -10862,14 +10862,14 @@ private:
 			// Vector weights
 			if (number_of_weights_per_object > 1) {
 				if (dccrg_instance->cell_weights_vectors.count(item.first) > 0) {
-				  for (uint veci=0; veci<number_of_weights_per_object; ++veci) {
-				    object_weights[i*number_of_weights_per_object+veci] = float((dccrg_instance->cell_weights_vectors.at(item.first)).at(veci));
-				    //object_weights[i*number_of_weights_per_object+veci] = float(1);
-				  }
+					for (uint veci=0; veci<number_of_weights_per_object; ++veci) {
+						object_weights[i*number_of_weights_per_object+veci] = float((dccrg_instance->cell_weights_vectors.at(item.first)).at(veci));
+						//object_weights[i*number_of_weights_per_object+veci] = float(1);
+					}
 				} else {
-				  for (uint veci=0; veci<number_of_weights_per_object; ++veci) {
-				    object_weights[i*number_of_weights_per_object+veci] = 1;
-				  }
+					for (uint veci=0; veci<number_of_weights_per_object; ++veci) {
+					object_weights[i*number_of_weights_per_object+veci] = 1;
+					}
 				}
 			}
 
