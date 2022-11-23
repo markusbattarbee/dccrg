@@ -768,7 +768,8 @@ public:
 		const uint64_t cell,
 		const int neighborhood_id = default_neighborhood_id
 	) const {
-		if (this->cell_data.count(cell) > 0) {
+                //if (this->cell_data.count(cell) > 0) {
+                if (this->cell_process.count(cell) > 0) {
 			if (neighborhood_id == default_neighborhood_id) {
 				#ifdef DEBUG
 				if (this->neighbors_of.count(cell) == 0) {
@@ -822,8 +823,8 @@ public:
 		const uint64_t cell,
 		const int neighborhood_id = default_neighborhood_id
 	) const {
-		if (this->cell_data.count(cell) > 0) {
-
+                //if (this->cell_data.count(cell) > 0) {
+                if (this->cell_process.count(cell) > 0) {
 			if (neighborhood_id == default_neighborhood_id) {
 				#ifdef DEBUG
 				if (this->neighbors_to.count(cell) == 0) {
@@ -2640,13 +2641,13 @@ public:
 	*/
 	std::vector<std::pair<uint64_t, int> > get_face_neighbors_of(
 		const uint64_t cell/*,
-		const int neighborhood_id = default_neighborhood_id*/
+                const int neighborhood_id = default_neighborhood_id*/
 	) const {
 		std::vector<std::pair<uint64_t, int> > ret_val;
 
-		if (this->cell_data.count(cell) == 0) {
-			return ret_val;
-		}
+ 		// if (this->cell_data.count(cell) == 0) {
+		// 	return ret_val;
+		// }
 
 		// get location of face neighbors' offsets in neighborhood_of
 		std::array<size_t, 2 * 3> neighborhood_of_indices = {{0, 0, 0, 0, 0, 0}};
@@ -2658,7 +2659,7 @@ public:
 			const size_t neigh_of_indices_index
 				= 2 * dimension + ((direction > 0) ? 1 : 0);
 
-			for (size_t i = 0; i <= this->neighborhood_of.size(); i++) {
+                        for (size_t i = 0; i <= this->neighborhood_of.size(); i++) {
 				if (i == this->neighborhood_of.size()) {
 					std::cerr << __FILE__ << ":" << __LINE__
 						<< " Neighborhood_of offsets not found for face neighbors in dimension: "
@@ -2684,14 +2685,14 @@ public:
 					neighborhood_of_indices[neigh_of_indices_index] = i;
 					break;
 				}
-			}
+                        }
 		}
 
 		// gather cells in given cell's neighbor_of list at indices found above
 		std::array<size_t, 2 * 3> current_index = {{0, 0, 0, 0, 0, 0}};
 		const int refinement_level = this->mapping.get_refinement_level(cell);
 
-		for (size_t
+                for (size_t
 			neighbor_i = 0;
 			neighbor_i < this->neighbors_of.at(cell).size();
 			neighbor_i++
@@ -2790,8 +2791,7 @@ public:
 			if (neigh_ref_lvl > refinement_level) {
 				neighbor_i += 7;
 			}
-		}
-
+                }
 		return ret_val;
 	}
 
@@ -2945,7 +2945,7 @@ public:
 		std::vector<std::pair<uint64_t, std::array<int, 4>>> return_neighbors;
 		if (
 			this->cell_process.count(cell) == 0
-			or this->cell_process.at(cell) != this->rank
+			//or this->cell_process.at(cell) != this->rank
 			or (x == 0 and y == 0 and z == 0)
 		) {
 			return return_neighbors;
@@ -3004,9 +3004,9 @@ public:
 			return ret_val;
 		}
 
-		if (this->cell_process.at(cell) != this->rank) {
-			return ret_val;
-		}
+		// if (this->cell_process.at(cell) != this->rank) {
+		// 	return ret_val;
+		// }
 
 		if (neighborhood_id != default_neighborhood_id
 		&& this->user_hood_of.count(neighborhood_id) == 0) {
@@ -3056,9 +3056,9 @@ public:
 			return ret_val;
 		}
 
-		if (this->cell_process.at(cell) != this->rank) {
-			return ret_val;
-		}
+		// if (this->cell_process.at(cell) != this->rank) {
+		// 	return ret_val;
+		// }
 
 		if (neighborhood_id != default_neighborhood_id
 		&& this->user_hood_of.count(neighborhood_id) == 0) {
@@ -6341,7 +6341,7 @@ public:
 		const bool sorted = false
 	) const {
 		std::vector<uint64_t> ret_val;
-
+                // Query MCB: Does this also return remote cells? There's no rank check.
 		if (neighborhood_id == default_neighborhood_id) {
 
 			for (const auto& item: this->cell_data) {
@@ -8903,7 +8903,27 @@ private:
 		}
 	}
 
+public:
+        void update_remote_cell_information(const std::vector<uint64_t> cells)
+	{
+	   for (uint i=0; i<cells.size(); i++) {
+	     this->update_neighbors(cells[i]);
+	   }
+	   // also remote neighbor info of user neighborhoods
+	   for (std::unordered_map<int, std::vector<Types<3>::neighborhood_item_t>>::const_iterator
+		 item = this->user_hood_of.begin();
+	         item != this->user_hood_of.end();
+	         item++
+	       ) {
+	      for (uint i=0; i<cells.size(); i++) {
+		 this->update_user_neighbors(cells[i],item->first);
+	      }
+	   }
+           // update_remote_neighbor_info() and update_user_remote_neighbor_info() are
+           // about which cells are actually remote or local so not touched here
+	}
 
+private:
 	/*!
 	Updates neighbor and neighbor_to lists around given cell's neighborhood.
 
@@ -8919,20 +8939,22 @@ private:
 			return;
 		}
 
-		if (this->cell_process.at(cell) != this->rank) {
-			return;
-		}
+		// if (this->cell_process.at(cell) != this->rank) {
+		// 	return;
+		// }
 
 		if (cell != this->get_child(cell)) {
 			return;
 		}
 
-		this->neighbors_of.at(cell) = this->find_neighbors_of(cell, this->neighborhood_of, this->max_ref_lvl_diff);
+		//this->neighbors_of.at(cell) = this->find_neighbors_of(cell, this->neighborhood_of, this->max_ref_lvl_diff);
+                this->neighbors_of[cell] = this->find_neighbors_of(cell, this->neighborhood_of, this->max_ref_lvl_diff);
 		std::vector<uint64_t> found_neighbors_of;
 		for (const auto& i: this->neighbors_of.at(cell)) {
 			found_neighbors_of.push_back(i.first);
 		}
-		this->neighbors_to.at(cell) = this->find_neighbors_to(cell, found_neighbors_of);
+		//this->neighbors_to.at(cell) = this->find_neighbors_to(cell, found_neighbors_of);
+                this->neighbors_to[cell] = this->find_neighbors_to(cell, found_neighbors_of);
 
 		#ifdef DEBUG
 		if (
@@ -8986,6 +9008,7 @@ private:
 				<< std::endl;
 			abort();
 		}
+                this->user_neigh_of[neighborhood_id][cell].clear();
 
 		#ifdef DEBUG
 		if (this->user_hood_to.count(neighborhood_id) == 0) {
@@ -8997,15 +9020,20 @@ private:
 		#endif
 
 		// find neighbors_of, should be in order given by user
-		this->user_neigh_of[neighborhood_id][cell].clear();
+		hood_of.clear();
 		for (const auto& item: this->user_hood_of[neighborhood_id]) {
 			const auto cells_at_offset
 				= this->get_neighbors_of_at_offset(cell, item[0], item[1], item[2]);
-			this->user_neigh_of[neighborhood_id][cell].insert(
-				this->user_neigh_of[neighborhood_id][cell].end(),
-				cells_at_offset.begin(),
-				cells_at_offset.end()
-			);
+                        // add non-existing neighbor due to grid boundary
+                        if (cells_at_offset.size() == 0) {
+                           hood_of.push_back({0, {0, 0, 0, 0}});
+                        } else {
+                           hood_of.insert(
+                              hood_of.end(),
+                              cells_at_offset.begin(),
+                              cells_at_offset.end()
+                              );
+                        }
 		}
 
 		// find neighbors_to
@@ -9022,7 +9050,7 @@ private:
 	*/
 	void update_remote_neighbor_info(const uint64_t cell)
 	{
-		if (this->cell_data.count(cell) == 0) {
+                if (this->cell_data.count(cell) == 0) {
 			return;
 		}
 
@@ -9114,9 +9142,9 @@ private:
 	*/
 	void update_user_remote_neighbor_info(const uint64_t cell, const int neighborhood_id)
 	{
-		if (this->cell_data.count(cell) == 0) {
-			return;
-		}
+                // if (this->cell_data.count(cell) == 0) {
+		// 	return;
+		// }
 
 		if (cell != this->get_child(cell)) {
 			return;
@@ -11715,7 +11743,7 @@ private:
 			return true;
 		}
 
-		// neighbors
+		// reference
 		const auto compare_neighbors
 			= this->find_neighbors_of(cell, hood_of, this->max_ref_lvl_diff);
 
