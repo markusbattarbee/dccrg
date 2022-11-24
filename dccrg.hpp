@@ -9008,7 +9008,7 @@ private:
 				<< std::endl;
 			abort();
 		}
-                this->user_neigh_of[neighborhood_id][cell].clear();
+                auto& hood_of = this->user_neigh_of[neighborhood_id][cell];
 
 		#ifdef DEBUG
 		if (this->user_hood_to.count(neighborhood_id) == 0) {
