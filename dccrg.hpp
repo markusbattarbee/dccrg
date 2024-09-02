@@ -3961,9 +3961,9 @@ public:
 
 		this->allocate_copies_of_remote_neighbors();
 		this->update_cell_pointers();
-		for (const auto& item: this->user_hood_of) {
-			this->allocate_copies_of_remote_neighbors(item.first);
-		}
+		// for (const auto& item: this->user_hood_of) {
+		// 	this->allocate_copies_of_remote_neighbors(item.first);
+		// }
 
 		this->refining = false;
 		return *this;
@@ -4559,9 +4559,9 @@ public:
 
 		this->allocate_copies_of_remote_neighbors();
 		this->update_cell_pointers();
-		for (const auto& item: this->user_hood_of) {
-			this->allocate_copies_of_remote_neighbors(item.first);
-		}
+		// for (const auto& item: this->user_hood_of) {
+		// 	this->allocate_copies_of_remote_neighbors(item.first);
+		// }
 
 		#ifdef DEBUG
 		if (!this->is_consistent()) {
@@ -6778,7 +6778,7 @@ public:
 		this->update_user_remote_neighbor_info(neighborhood_id);
 
 		this->recalculate_neighbor_update_send_receive_lists(neighborhood_id);
-		this->allocate_copies_of_remote_neighbors(neighborhood_id);
+		// this->allocate_copies_of_remote_neighbors(neighborhood_id);
 
 		#ifdef DEBUG
 		if (!this->is_consistent()) {
@@ -9507,6 +9507,7 @@ private:
 	*/
 	void induce_refines()
 	{
+		// Verified: override_refines() already stores only local cells to this->cells_to_refine
 		std::vector<uint64_t> new_refines(this->cells_to_refine.begin(), this->cells_to_refine.end());
 		while (All_Reduce()(new_refines.size(), this->comm) > 0) {
 
@@ -9720,6 +9721,7 @@ private:
 	{
 		using std::to_string;
 
+		// Warning! this->cells_not_to_unrefine may contain non-local cells which can lead to a large all-to-all communication.
 		this->all_to_all_set(this->cells_not_to_unrefine);
 
 		// unrefines that were not overridden
