@@ -4858,7 +4858,7 @@ public:
 			Types<3>::neighborhood_item_t offsets = {-inverse_offsets[0], -inverse_offsets[1], -inverse_offsets[2]};
 			std::set<uint64_t> neigh_cells;
 			for(const auto& dims : dim_permutations) {
-				neigh_cells.merge(this->find_cells_at_offset(this->mapping.get_indices(cell),cell, refinement_level, inverse_offsets, dims));
+				neigh_cells.merge(this->find_cells_at_offset(this->mapping.get_indices(cell),cell, refinement_level, offsets, dims));
 			}
 
 			for (const auto& neighCell : neigh_cells) {
