@@ -3456,8 +3456,8 @@ public:
 			if (this->cell_process.at(parent) == this->rank) {
 				this->cell_data[parent];
 				this->neighbors_of[parent] = new_neighbors_of;
-                                this->neighbors_to[cell] = this->find_neighbors_to(cell, this->neighborhood_to);
-                                //this->neighbors_to[cell] = this->fill_neighbors_to(cell, this->neighborhood_to);
+				this->neighbors_to[parent] = this->find_neighbors_to(parent, this->neighborhood_to);
+				//this->neighbors_to[parent] = this->fill_neighbors_to(parent, this->neighborhood_to);
 				this->face_neighbors_of[parent] = this->find_face_neighbors_of(parent);
 
 				// add user neighbor lists
@@ -7912,8 +7912,8 @@ private:
 			}
 			#endif
 
-			// Base neighbourhood is symmetric, so just construct symmetric complement.
 			this->neighbors_to[item.first] = this->find_neighbors_to(item.first, this->neighborhood_to);
+			// Base neighbourhood is symmetric, so just construct symmetric complement instead.
 			//this->neighbors_to[item.first] = this->fill_neighbors_to(item.first, this->neighborhood_to);
 			this->face_neighbors_of[item.first] = this->find_face_neighbors_of(item.first);
 		}
